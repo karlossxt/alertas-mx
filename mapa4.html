@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Alertas Carreteras MX — PRO</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root{
+  --bg:#08121a; --panel:#0f1720; --muted:#98a0ad; --accent:#1ea7ff;
+  --success:#4caf50; --danger:#f44336; --warn:#ff9800; --glass: rgba(255,255,255,0.03);
+}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#071016 0%, #081521 100%); color:#e6eef6;}
+.app{ display:grid; grid-template-columns:360px 1fr; grid-template-rows:64px 1fr; height:100vh; gap:12px; padding:12px; box-sizing:border-box; }
+
+/* header */
+header.app-header{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; padding:12px 18px; background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:10px; box-shadow: 0 6px 18px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); }
+.brand{ display:flex; gap:12px; align-items:center; }
+.brand img{ width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid rgba(255,255,255,0.05); }
+.brand h1{ font-size:1.05rem; margin:0; font-weight:700; color:#fff; }
+.brand small{ display:block; color:var(--muted); font-size:0.78rem; margin-top:2px; }
+
+/* sidebar */
+aside.sidebar{ background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01)); border-radius:10px; padding:14px; box-shadow: 0 6px 20px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); overflow:auto; }
+.controls-row{ display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.btn { background:var(--glass); color:var(--muted); border:1px solid rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.9rem; }
+.btn.primary{ background:linear-gradient(90deg,#1e6fd9,#0fb3ff); color:white; border:none; box-shadow:0 6px 18px rgba(20,80,160,0.24); }
+.filters{ display:flex; gap:8px; }
+.chip{ padding:8px 10px; border-radius:999px; cursor:pointer; font-weight:700; font-size:0.85rem; display:flex; gap:8px; align-items:center; border:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.02); color:var(--muted); }
+.chip.active{ color:white; background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015)); box-shadow: 0 4px 12px rgba(3,6,15,0.6); }
+
+.stats{ display:flex; gap:8px; margin:12px 0 18px; }
+.stat{ flex:1; padding:12px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.02); text-align:center; }
+.stat b{ display:block; font-size:1.1rem; color:#fff; }
+.stat small{ color:var(--muted); }
+
+.list{ display:flex; flex-direction:column; gap:10px; }
+.card{ padding:10px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.02); display:flex; gap:10px; align-items:flex-start; }
+.marker{ width:12px;height:12px;border-radius:50%;margin-top:6px; flex-shrink:0; }
+.card .title{ font-weight:700; color:#fff; font-size:0.95rem; }
+.card .meta{ font-size:0.8rem; color:var(--muted); margin-top:6px; }
+.card .actions{ margin-left:auto; display:flex; gap:6px; align-items:center; }
+
+/* map */
+section.map-area{ position:relative; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.03); box-shadow: 0 6px 20px rgba(2,6,23,0.6); }
+#map{ width:100%; height:calc(100vh - 110px); min-height:420px; }
+.top-controls{ position:absolute; right:12px; top:12px; z-index:1000; display:flex; gap:8px; flex-wrap:wrap; }
+.badge{ background:rgba(0,0,0,0.5); padding:8px 10px; border-radius:8px; color:var(--muted); border:1px solid rgba(255,255,255,0.03); font-weight:700; }
+
+/* toast */
+.toast-wrap{ position:fixed; right:18px; bottom:18px; z-index:2000; display:flex; flex-direction:column; gap:8px; }
+.toast{ background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); padding:10px 14px; border-radius:10px; min-width:260px; color:#fff; box-shadow:0 8px 30px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); transform:translateY(10px); opacity:0; animation:toast-in .35s forwards; }
+@keyframes toast-in{ to{ transform:none; opacity:1; } }
+
+/* responsive */
+@media (max-width:980px){
+  .app{ grid-template-columns:1fr; grid-template-rows:64px 1fr; padding:8px; }
+  aside.sidebar{ order:2; width:100%; height:42vh; }
+  section.map-area{ order:1; height:calc(100vh - 64px - 42vh - 36px); }
+  #map{ height:100%; min-height:240px; }
+}
+.muted{ color:var(--muted); font-size:0.85rem; }
+.small{ font-size:0.82rem; color:var(--muted); }
+a.link{ color:var(--accent); text-decoration:none; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <div class="brand">
+      <!-- imagen local subida -->
+      <img src="/mnt/data/de849e71-8f12-4ce1-92b0-a8f86b9c1cf3.png" alt="logo" onerror="this.style.display='none'">
+      <div>
+        <h1>Alertas Carreteras MX</h1>
+        <small>Operativo en tiempo real — PRO</small>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="small muted">Fuentes: <b id="source-count">5</b></div>
+      <button id="dark-toggle" class="btn">Modo claro</button>
+      <button id="export-all" class="btn">Export CSV</button>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="controls-row">
+      <div class="filters" role="toolbar" aria-label="Filtros">
+        <div id="filter-red" class="chip active" data-type="red"><span style="width:10px;height:10px;border-radius:50%;background:var(--danger);display:inline-block"></span> Bloqueos</div>
+        <div id="filter-orange" class="chip active" data-type="orange"><span style="width:10px;height:10px;border-radius:50%;background:var(--warn);display:inline-block"></span> Incidentes</div>
+        <div id="filter-green" class="chip active" data-type="green"><span style="width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block"></span> Vía libre</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="total-count">0</b><small>Total detectadas</small></div>
+      <div class="stat"><b id="active-count">0</b><small>Activas</small></div>
+      <div class="stat"><b id="new-count">0</b><small>Nuevas (últ. minuto)</small></div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="small muted">Lista (últimas 500)</div>
+      <div style="display:flex;gap:6px">
+        <button id="clear-all" class="btn">Limpiar</button>
+        <button id="download-history" class="btn">Descargar historial</button>
+      </div>
+    </div>
+
+    <div id="alerts-list" class="list" aria-live="polite">
+      <div class="small muted">Sin alertas aún</div>
+    </div>
+
+    <div style="margin-top:12px" class="small muted">Estado: <span id="status">Iniciado</span></div>
+  </aside>
+
+  <section class="map-area">
+    <div id="map"></div>
+    <div class="top-controls">
+      <div class="badge" id="last-update">—</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- audio -->
+<audio id="sound-block" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+<audio id="sound-incident" src="https://actions.google.com/sounds/v1/notifications/notification_1.ogg" preload="auto"></audio>
+<audio id="sound-clear" src="https://actions.google.com/sounds/v1/alarms/digital_watch_beep.ogg" preload="auto"></audio>
+
+<script>
+// ---------- CONFIG ----------
+const FEEDS = [
+  { id: "gobierno", url: "https://rss.app/feeds/v1.1/qWyKD6O0BZNvn6ti.json", name: "Gobierno MX" },
+  { id: "transportistas", url: "https://rss.app/feeds/v1.1/xH6Ye0PnCAg4MdMS.json", name: "Transportistas" },
+  { id: "medios", url: "https://rss.app/feeds/v1.1/pgkmg1Pslny7nP4D.json", name: "Medios" },
+  { id: "twitter", url: "https://rss.app/feeds/v1.1/A31TfEriVpwisaKn.json", name: "Twitter" },
+  { id: "locales", url: "https://rss.app/feeds/v1.1/4aUyYkWPD1lDnjrw.json", name: "Locales" }
+];
+const PROXY = "https://api.allorigins.win/get?url=";
+
+// base de ubicaciones
+const ubicaciones = {
+  "km54 méx-toluca": { coords: [19.2600, -99.4900], name: "Méx–Toluca km 54" },
+  "km56 méx-toluca": { coords: [19.2480, -99.4820], name: "Méx–Toluca km 56" },
+  "la marquesa": { coords: [19.3780, -99.5120], name: "La Marquesa" },
+  "san lucas": { coords: [19.7720, -99.1120], name: "San Lucas" },
+  "peñón": { coords: [19.5120, -98.9420], name: "Peñón" },
+  "amozoc": { coords: [19.1830, -98.2100], name: "Amozoc" },
+  "alpuyeca": { coords: [18.9090, -99.2600], name: "Alpuyeca" },
+  "lópez portillo lomas verdes": { coords: [19.5050, -99.2200], name: "López Portillo – Lomas Verdes" },
+  "tapachula": { coords: [14.9070, -92.2490], name: "Tapachula" },
+  "nogales": { coords: [31.3020, -110.9450], name: "Nogales" },
+  "cdmx": { coords: [19.4326, -99.1332], name: "CDMX" },
+  "desconocido": { coords: [23.0, -102.0], name: "Ubicación desconocida" }
+};
+
+// estado
+let alertsList = JSON.parse(localStorage.getItem('alerts_active_v2')||'[]');
+let history = JSON.parse(localStorage.getItem('alerts_history_v2')||'[]');
+let filters = { red:true, orange:true, green:true };
+let lastUpdate = 0;
+
+// mapa
+const map = L.map('map').setView([20.5, -100.5], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const markerLayer = L.layerGroup().addTo(map);
+
+// util
+const el = id => document.getElementById(id);
+const toasts = el('toasts');
+
+/* toast */
+function showToast(title, body, color){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<div style="display:flex;gap:8px;align-items:center">
+    <div style="width:10px;height:10px;border-radius:50%;background:${color}"></div>
+    <div style="flex:1"><b>${title}</b><div style="font-size:0.85rem;color:var(--muted)">${body}</div></div>
+    <div style="margin-left:8px"><button class="btn" onclick="void(0)">Ver</button></div>
+  </div>`;
+  toasts.appendChild(t);
+  setTimeout(()=> t.remove(), 6000);
+}
+
+/* sonido */
+let soundEnabled = true;
+function playSound(type){
+  if(!soundEnabled) return;
+  const s = { red: el('sound-block'), orange: el('sound-incident'), green: el('sound-clear') }[type];
+  if(s) s.play().catch(()=>{});
+}
+
+/* filtros UI */
+['red','orange','green'].forEach(type=>{
+  const btn = el('filter-'+type);
+  if(!btn) return;
+  btn.onclick = () => {
+    filters[type] = !filters[type];
+    btn.classList.toggle('active', filters[type]);
+    renderAlerts();
+  };
+});
+
+/* botones */
+el('clear-all').onclick = () => { alertsList = []; saveState(); renderAlerts(); updateStatusUI(); };
+el('export-all').onclick = () => downloadCSV(history, 'alertas_todas_historial.csv');
+el('download-history').onclick = () => downloadCSV(history, 'alertas_historial.csv');
+
+/* estado UI */
+function updateStatusUI(){
+  el('active-count').textContent = alertsList.length;
+  el('total-count').textContent = history.length;
+  el('new-count').textContent = alertsList.filter(a=> (Date.now()-a.detectedAt)<60000).length;
+  el('last-update').textContent = lastUpdate ? `Últ: ${new Date(lastUpdate).toLocaleTimeString()}` : '—';
+  el('source-count').textContent = FEEDS.length;
+}
+
+/* CSV export */
+function downloadCSV(rows, name){
+  if(!rows || !rows.length) return alert('No hay datos para exportar.');
+  const header = ['Fecha','Hora','Tipo','Fuente','Ubicación','Título','Descripción'];
+  const lines = [header.join(',')];
+  rows.forEach(r=>{
+    const d = new Date(r.detectedAt);
+    lines.push([d.toLocaleDateString(), d.toLocaleTimeString(), r.type, r.feedSource, `"${(r.locationName||'').replace(/"/g,'""')}"`, `"${(r.title||'').replace(/"/g,'""')}"`, `"${(r.description||'').replace(/"/g,'""')}"`].join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 2000);
+}
+
+/* render lista y mapa */
+function renderAlerts(){
+  const list = el('alerts-list');
+  const visible = alertsList.filter(a => filters[a.type]);
+  if(!visible.length){
+    list.innerHTML = `<div class="small muted">Sin alertas activas</div>`;
+  } else {
+    list.innerHTML = visible.slice(0,500).map(a=>{
+      const color = a.type==='red'? 'var(--danger)' : a.type==='green'? 'var(--success)' : (a.locationKey==='desconocido' ? '#777' : 'var(--warn)');
+      return `<div class="card">
+        <div class="marker" style="background:${color}"></div>
+        <div>
+          <div class="title">${escapeHtml(a.title) || 'Alerta'}</div>
+          <div class="meta">${escapeHtml(a.feedSource)} · ${escapeHtml(a.locationName)} · ${new Date(a.detectedAt).toLocaleTimeString()}</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="zoomToAlert('${a.id}')">Ir</button>
+          <button class="btn" onclick="removeAlert('${a.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  markerLayer.clearLayers();
+  visible.forEach(a=>{
+    const loc = (a.coords && Array.isArray(a.coords)) ? { coords: a.coords, name: a.locationName } : (ubicaciones[a.locationKey] || ubicaciones['desconocido']);
+    const color = a.type==='red'? '#f44336' : a.type==='green'? '#4caf50' : (a.locationKey==='desconocido' ? '#777' : '#ff9800');
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:18px;height:18px;border-radius:50%;background:${color};box-shadow:0 2px 8px rgba(0,0,0,0.6);border:2px solid rgba(255,255,255,0.06)"></div>`,
+      iconSize:[18,18], iconAnchor:[9,9]
+    });
+    const m = L.marker(loc.coords, {icon}).addTo(markerLayer);
+    m.bindPopup(`<b>${escapeHtml(a.title)}</b><br>${escapeHtml(a.feedSource)}<br>📍 ${escapeHtml(a.locationName)}<br><small>${new Date(a.detectedAt).toLocaleString()}</small>`);
+  });
+
+  updateStatusUI();
+}
+
+/* zoom / remove */
+function zoomToAlert(id){
+  const a = alertsList.find(x=>x.id===id);
+  if(!a) return;
+  const coords = a.coords || (ubicaciones[a.locationKey] && ubicaciones[a.locationKey].coords) || [19.4326, -99.1332];
+  map.setView(coords, 12, {animate:true});
+}
+
+function removeAlert(id){
+  alertsList = alertsList.filter(a=>a.id!==id);
+  saveState();
+  renderAlerts();
+  updateStatusUI();
+}
+
+/* persistencia */
+function saveState(){
+  try{
+    localStorage.setItem('alerts_active_v2', JSON.stringify(alertsList));
+    localStorage.setItem('alerts_history_v2', JSON.stringify(history));
+  }catch(e){}
+}
+
+/* hashing unicode-safe */
+async function uuidFromString(str){
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  const hex = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  return hex.slice(0,16);
+}
+
+/* sanitize simple */
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
+
+/* ---------- DETECCIÓN PRECISIÓN MEDIA ---------- */
+function normalizeString(s){
+  return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ñ/g,'n');
+}
+
+function getLocationFromItem(item){
+  // 1) coordinates explicit
+  if(item.latitude && item.longitude){
+    return { coords: [Number(item.latitude), Number(item.longitude)], name: item.title || 'Posición' };
+  }
+  if(item.lat && item.lon) return { coords: [Number(item.lat), Number(item.lon)], name: item.title || 'Posición' };
+
+  const text = (item.title||'') + ' ' + (item.description||'');
+  const lower = text.toLowerCase();
+
+  // km detection
+  const kmMatch = lower.match(/\bkm\.?\s*([0-9]{1,3})\b/);
+  if(kmMatch){
+    const km = Number(kmMatch[1]);
+    // heurística Mexico-Toluca
+    if(km >= 40 && km <= 70){
+      return { key: km <= 55 ? "km54 méx-toluca" : "km56 méx-toluca" };
+    }
+    // heurística Mexico-Puebla
+    if(km >= 10 && km <= 120){
+      if(km < 40) return { key: "peñón" };
+      if(km < 60) return { key: "amozoc" };
+      return { key: "cdmx" };
+    }
+  }
+
+  // specific places (longest-first)
+  const keys = Object.keys(ubicaciones).sort((a,b)=>b.length-a.length);
+  for(const k of keys){
+    if(k === 'desconocido') continue;
+    const name = k.toLowerCase();
+    if(lower.indexOf(name) !== -1) return { key: k };
+    const pretty = normalizeString(ubicaciones[k].name).toLowerCase();
+    if(normalizeString(lower).indexOf(pretty) !== -1) return { key: k };
+  }
+
+  // city / state keywords
+  if(/toluca/.test(lower)) return { key: "km54 méx-toluca" };
+  if(/cuernavaca/.test(lower)) return { key: "alpuyeca" };
+  if(/puebla/.test(lower)) return { key: "amozoc" };
+  if(/cdmx|ciudad de mexico|ciudad de méxico|edomex|edo mex/.test(lower)) return { key: "cdmx" };
+  if(/tapachula/.test(lower)) return { key: "tapachula" };
+  if(/nogales/.test(lower)) return { key: "nogales" };
+
+  // fallback → desconocido
+  return { key: "desconocido" };
+}
+
+/* ---------- Parser robusto via proxy (JSON o XML) ---------- */
+async function fetchFeedViaProxy(feedUrl){
+  const proxyUrl = PROXY + encodeURIComponent(feedUrl);
+  const respText = await fetch(proxyUrl).then(r => r.text());
+  try{
+    const wrapper = JSON.parse(respText);
+    if(wrapper && wrapper.contents){
+      // try parse contents as JSON
+      try{ return JSON.parse(wrapper.contents); }
+      catch(e){
+        // if not JSON, try to parse as XML using DOMParser for <item>
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(wrapper.contents, "text/xml");
+        if(doc && doc.getElementsByTagName){
+          // build items array from <item> nodes
+          const items = [];
+          const nodes = doc.getElementsByTagName('item');
+          for(let i=0;i<nodes.length;i++){
+            const n = nodes[i];
+            const title = (n.getElementsByTagName('title')[0]||{}).textContent || '';
+            const description = (n.getElementsByTagName('description')[0]||{}).textContent || '';
+            const pubDate = (n.getElementsByTagName('pubDate')[0]||{}).textContent || '';
+            const lat = (n.getElementsByTagName('geo:lat')[0]||{}).textContent || (n.getElementsByTagName('latitude')[0]||{}).textContent;
+            const lon = (n.getElementsByTagName('geo:long')[0]||{}).textContent || (n.getElementsByTagName('longitude')[0]||{}).textContent;
+            items.push({ title, description, pubDate, latitude: lat, longitude: lon });
+          }
+          return { items };
+        }
+        // fallback return raw
+        return { raw: wrapper.contents };
+      }
+    }
+  }catch(e){
+    // respText might be direct JSON or raw
+    try{ return JSON.parse(respText); } catch(e2){
+      // fallback try parsing as XML
+      try{
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(respText, "text/xml");
+        const items = [];
+        const nodes = doc.getElementsByTagName('item');
+        for(let i=0;i<nodes.length;i++){
+          const n = nodes[i];
+          const title = (n.getElementsByTagName('title')[0]||{}).textContent || '';
+          const description = (n.getElementsByTagName('description')[0]||{}).textContent || '';
+          const pubDate = (n.getElementsByTagName('pubDate')[0]||{}).textContent || '';
+          const lat = (n.getElementsByTagName('geo:lat')[0]||{}).textContent || (n.getElementsByTagName('latitude')[0]||{}).textContent;
+          const lon = (n.getElementsByTagName('geo:long')[0]||{}).textContent || (n.getElementsByTagName('longitude')[0]||{}).textContent;
+          items.push({ title, description, pubDate, latitude: lat, longitude: lon });
+        }
+        if(items.length) return { items };
+      }catch(e3){}
+      return { raw: respText };
+    }
+  }
+}
+
+/* ---------- MAIN: actualizar alertas ---------- */
+async function updateAlerts(){
+  el('status').textContent = 'Actualizando...';
+  try{
+    const results = await Promise.all(FEEDS.map(f => fetchFeedViaProxy(f.url).then(data => ({ feedName: f.name, data })) ));
+    lastUpdate = Date.now();
+    let added = 0;
+
+    for(const res of results){
+      const feedName = res.feedName;
+      const data = res.data;
+      if(!data) continue;
+      let items = [];
+      if(Array.isArray(data.items)) items = data.items;
+      else if(data.feed && Array.isArray(data.feed.items)) items = data.feed.items;
+      else if(data.raw) {
+        // fallback: try <item> via regex (very fallback)
+        const raw = data.raw;
+        const matches = raw.match(/<item[\s\S]*?<\/item>/gi);
+        if(matches){
+          items = matches.map(block => {
+            const t = (block.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1] || '';
+            const d = (block.match(/<description[^>]*>([\s\S]*?)<\/description>/i)||[])[1] || '';
+            const lat = (block.match(/<geo:lat[^>]*>([\s\S]*?)<\/geo:lat>/i)||[])[1];
+            const lon = (block.match(/<geo:long[^>]*>([\s\S]*?)<\/geo:long>/i)||[])[1] || (block.match(/<geo:lon[^>]*>([\s\S]*?)<\/geo:lon>/i)||[])[1];
+            return { title: t, description: d, latitude: lat, longitude: lon };
+          });
+        }
+      }
+
+      // process items sequentially because uuidFromString is async
+      for(const item of items){
+        const title = (item.title||item.link||'Alerta').trim();
+        const description = (item.description||item.content||'').trim();
+        const pub = item.pubDate || item.isoDate || Date.now();
+
+        const text = (title + ' ' + description).toLowerCase();
+        let type = 'orange';
+        if(/bloqueo|cierre|protesta|reten|manifestaci/i.test(text)) type = 'red';
+        if(/libre|reabierto|fluye|restaurad/i.test(text)) type = 'green';
+
+        // location heuristic
+        const loc = getLocationFromItem(item);
+        let locationKey = loc.key;
+        let coords = loc.coords;
+        if(item.latitude && item.longitude){
+          coords = [Number(item.latitude), Number(item.longitude)];
+        } else if(item.lat && item.lon){
+          coords = [Number(item.lat), Number(item.lon)];
+        }
+
+        const locationName = coords ? `Coordenadas (${coords[0].toFixed(4)}, ${coords[1].toFixed(4)})` : (ubicaciones[locationKey]?.name || 'Desconocida');
+
+        const rawId = (title || '') + '|' + (description || '') + '|' + feedName + '|' + (pub || Date.now());
+        const id = await uuidFromString(rawId);
+
+        if(history.some(h => h.id === id)) continue;
+
+        const detectedAt = (new Date(pub)).getTime() || Date.now();
+
+        const alertObj = { id, title, description, feedSource: feedName, type, locationKey, locationName, detectedAt, coords };
+        history.unshift(alertObj);
+        alertsList.unshift(alertObj);
+        added++;
+
+        playSound(type);
+        showToast(type==='red' ? 'Bloqueo detectado' : type==='green' ? 'Vía libre' : 'Incidente', `${alertObj.locationName} · ${alertObj.feedSource}`, type==='red' ? '#f44336' : type==='green' ? '#4caf50' : '#ff9800');
+
+        if(type === 'red'){
+          const zcoords = coords || (ubicaciones[locationKey] && ubicaciones[locationKey].coords) || [19.4326,-99.1332];
+          map.setView(zcoords, 12, {animate:true});
+        }
+      }
+    }
+
+    // expire alerts
+    const now = Date.now();
+    alertsList = alertsList.filter(a => {
+      const maxAge = a.type==='red' ? 240*60000 : a.type==='green' ? 60*60000 : 120*60000;
+      return (now - a.detectedAt) < maxAge;
+    });
+
+    alertsList = alertsList.slice(0,500);
+    history = history.slice(0,5000);
+
+    saveState();
+    renderAlerts();
+    updateStatusUI();
+    el('status').textContent = `OK — nuevas: ${added}`;
+    lastUpdate = Date.now();
+    updateStatusUI();
+
+  }catch(e){
+    console.error(e);
+    el('status').innerHTML = 'ERROR: ' + (e.message || e.toString()).slice(0,200);
+  }
+}
+
+/* start */
+renderAlerts();
+updateStatusUI();
+updateAlerts();
+setInterval(updateAlerts, 60000);
+</script>
+</body>
+</html>
