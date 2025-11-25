@@ -1,526 +1,1088 @@
-<!doctype html>
+ <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Alertas Carreteras MX — PRO</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-:root{
-  --bg:#08121a; --panel:#0f1720; --muted:#98a0ad; --accent:#1ea7ff;
-  --success:#4caf50; --danger:#f44336; --warn:#ff9800; --glass: rgba(255,255,255,0.03);
-}
-html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#071016 0%, #081521 100%); color:#e6eef6;}
-.app{ display:grid; grid-template-columns:360px 1fr; grid-template-rows:64px 1fr; height:100vh; gap:12px; padding:12px; box-sizing:border-box; }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Alertas Carreteras MX — PRO</title>
+  <meta name="description" content="Sistema de alertas viales en tiempo real para México. Bloqueos, incidentes y vía libre con ubicación precisa.">
 
-/* header */
-header.app-header{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; padding:12px 18px; background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:10px; box-shadow: 0 6px 18px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); }
-.brand{ display:flex; gap:12px; align-items:center; }
-.brand img{ width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid rgba(255,255,255,0.05); }
-.brand h1{ font-size:1.05rem; margin:0; font-weight:700; color:#fff; }
-.brand small{ display:block; color:var(--muted); font-size:0.78rem; margin-top:2px; }
+  <!-- Icons -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚨</text></svg>">
+  
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-/* sidebar */
-aside.sidebar{ background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01)); border-radius:10px; padding:14px; box-shadow: 0 6px 20px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); overflow:auto; }
-.controls-row{ display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.btn { background:var(--glass); color:var(--muted); border:1px solid rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.9rem; }
-.btn.primary{ background:linear-gradient(90deg,#1e6fd9,#0fb3ff); color:white; border:none; box-shadow:0 6px 18px rgba(20,80,160,0.24); }
-.filters{ display:flex; gap:8px; }
-.chip{ padding:8px 10px; border-radius:999px; cursor:pointer; font-weight:700; font-size:0.85rem; display:flex; gap:8px; align-items:center; border:1px solid rgba(255,255,255,0.03); background:rgba(255,255,255,0.02); color:var(--muted); }
-.chip.active{ color:white; background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015)); box-shadow: 0 4px 12px rgba(3,6,15,0.6); }
+  <!-- Plugins -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
-.stats{ display:flex; gap:8px; margin:12px 0 18px; }
-.stat{ flex:1; padding:12px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.02); text-align:center; }
-.stat b{ display:block; font-size:1.1rem; color:#fff; }
-.stat small{ color:var(--muted); }
+  <style>
+    :root{
+      --bg:#08121a; --panel:#0f1720; --muted:#98a0ad; --accent:#1ea7ff;
+      --success:#4caf50; --danger:#f44336; --warn:#ff9800; --glass: rgba(255,255,255,0.03);
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#071016 0%, #081521 100%); color:#e6eef6;}
+    .app{ display:grid; grid-template-columns:360px 1fr; grid-template-rows:64px 1fr; height:100vh; gap:12px; padding:12px; box-sizing:border-box; }
 
-.list{ display:flex; flex-direction:column; gap:10px; }
-.card{ padding:10px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.02); display:flex; gap:10px; align-items:flex-start; }
-.marker{ width:12px;height:12px;border-radius:50%;margin-top:6px; flex-shrink:0; }
-.card .title{ font-weight:700; color:#fff; font-size:0.95rem; }
-.card .meta{ font-size:0.8rem; color:var(--muted); margin-top:6px; }
-.card .actions{ margin-left:auto; display:flex; gap:6px; align-items:center; }
+    /* header */
+    header.app-header{
+      grid-column:1/-1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 0;
+      background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:10px;
+      box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .header-content{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+    }
+    .brand-logo{
+      width:64px;
+      height:64px;
+      object-fit:contain;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+    }
+    .brand h1{
+      font-size:1.25rem;
+      margin:0;
+      font-weight:800;
+      color:#fff;
+      text-align:center;
+    }
+    .brand small{
+      display:block;
+      color:var(--muted);
+      font-size:0.85rem;
+      margin-top:2px;
+      text-align:center;
+    }
 
-/* map */
-section.map-area{ position:relative; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.03); box-shadow: 0 6px 20px rgba(2,6,23,0.6); }
-#map{ width:100%; height:calc(100vh - 110px); min-height:420px; }
-.top-controls{ position:absolute; right:12px; top:12px; z-index:1000; display:flex; gap:8px; flex-wrap:wrap; }
-.badge{ background:rgba(0,0,0,0.5); padding:8px 10px; border-radius:8px; color:var(--muted); border:1px solid rgba(255,255,255,0.03); font-weight:700; }
+    /* sidebar */
+    aside.sidebar{
+      background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));
+      border-radius:10px;
+      padding:14px;
+      box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+      overflow:auto;
+    }
+    .controls-row{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-bottom:12px;
+      flex-wrap:wrap;
+    }
+    .btn {
+      background:var(--glass);
+      color:var(--muted);
+      border:1px solid rgba(255,255,255,0.03);
+      padding:8px 10px;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:0.9rem;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(255,255,255,0.06);
+    }
+    .btn.primary{
+      background:linear-gradient(90deg,#1e6fd9,#0fb3ff);
+      color:white;
+      border:none;
+      box-shadow:0 6px 18px rgba(20,80,160,0.24);
+    }
+    .filters{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .chip{
+      padding:8px 10px;
+      border-radius:999px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:0.85rem;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      border:1px solid rgba(255,255,255,0.03);
+      background:rgba(255,255,255,0.02);
+      color:var(--muted);
+      transition: all 0.2s;
+    }
+    .chip:hover {
+      background: rgba(255,255,255,0.04);
+    }
+    .chip.active{
+      color:white;
+      background:linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      box-shadow: 0 4px 12px rgba(3,6,15,0.6);
+    }
 
-/* toast */
-.toast-wrap{ position:fixed; right:18px; bottom:18px; z-index:2000; display:flex; flex-direction:column; gap:8px; }
-.toast{ background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); padding:10px 14px; border-radius:10px; min-width:260px; color:#fff; box-shadow:0 8px 30px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); transform:translateY(10px); opacity:0; animation:toast-in .35s forwards; }
-@keyframes toast-in{ to{ transform:none; opacity:1; } }
+    .stats{
+      display:flex;
+      gap:8px;
+      margin:12px 0 18px;
+    }
+    .stat{
+      flex:1;
+      padding:12px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.02);
+      text-align:center;
+    }
+    .stat b{
+      display:block;
+      font-size:1.1rem;
+      color:#fff;
+    }
+    .stat small{
+      color:var(--muted);
+    }
+    .stat.ignored b { color: #ff6b6b; }
 
-/* responsive */
-@media (max-width:980px){
-  .app{ grid-template-columns:1fr; grid-template-rows:64px 1fr; padding:8px; }
-  aside.sidebar{ order:2; width:100%; height:42vh; }
-  section.map-area{ order:1; height:calc(100vh - 64px - 42vh - 36px); }
-  #map{ height:100%; min-height:240px; }
-}
-.muted{ color:var(--muted); font-size:0.85rem; }
-.small{ font-size:0.82rem; color:var(--muted); }
-a.link{ color:var(--accent); text-decoration:none; font-weight:700; }
-</style>
+    .list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .card{
+      padding:10px;
+      border-radius:10px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.02);
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .marker{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      margin-top:6px;
+      flex-shrink:0;
+    }
+    .card .title{
+      font-weight:700;
+      color:#fff;
+      font-size:0.95rem;
+    }
+    .card .meta{
+      font-size:0.8rem;
+      color:var(--muted);
+      margin-top:6px;
+    }
+    .card .actions{
+      margin-left:auto;
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+
+    /* map */
+    section.map-area{
+      position:relative;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.03);
+      box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+    }
+    #map{
+      width:100%;
+      height:calc(100vh - 110px);
+      min-height:420px;
+    }
+    .top-controls{
+      position:absolute;
+      right:12px;
+      top:12px;
+      z-index:1000;
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .badge{
+      background:rgba(0,0,0,0.5);
+      padding:8px 10px;
+      border-radius:8px;
+      color:var(--muted);
+      border:1px solid rgba(255,255,255,0.03);
+      font-weight:700;
+    }
+
+    /* toast */
+    .toast-wrap{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      z-index:2000;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .toast{
+      background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      padding:10px 14px;
+      border-radius:10px;
+      min-width:260px;
+      color:#fff;
+      box-shadow:0 8px 30px rgba(2,6,23,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+      transform:translateY(10px);
+      opacity:0;
+      animation:toast-in .35s forwards;
+    }
+    @keyframes toast-in{ to{ transform:none; opacity:1; } }
+
+    /* responsive */
+    @media (max-width:980px){
+      .app{ grid-template-columns:1fr; grid-template-rows:64px 1fr; padding:8px; }
+      aside.sidebar{ order:2; width:100%; height:42vh; }
+      section.map-area{ order:1; height:calc(100vh - 64px - 42vh - 36px); }
+      #map{ height:100%; min-height:240px; }
+      .header-content{ width:100%; }
+      .brand h1{ font-size:1.1rem; }
+    }
+    .muted{ color:var(--muted); font-size:0.85rem; }
+    .small{ font-size:0.82rem; color:var(--muted); }
+    a.link{ color:var(--accent); text-decoration:none; font-weight:700; }
+
+    /* Scroll suave */
+    * { scrollbar-width: thin; scrollbar-color: #1e3a5f #0c1a28; }
+    *::-webkit-scrollbar { width: 8px; height: 8px; }
+    *::-webkit-scrollbar-track { background: #0c1a28; border-radius: 4px; }
+    *::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 4px; }
+  </style>
 </head>
 <body>
-<div class="app">
-
-  <header class="app-header">
-    <div class="brand">
-      <!-- imagen local subida -->
-      <img src="/mnt/data/de849e71-8f12-4ce1-92b0-a8f86b9c1cf3.png" alt="logo" onerror="this.style.display='none'">
-      <div>
-        <h1>Alertas Carreteras MX</h1>
-        <small>Operativo en tiempo real — PRO</small>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:10px;align-items:center;">
-      <div class="small muted">Fuentes: <b id="source-count">5</b></div>
-      <button id="dark-toggle" class="btn">Modo claro</button>
-      <button id="export-all" class="btn">Export CSV</button>
-    </div>
-  </header>
-
-  <aside class="sidebar">
-    <div class="controls-row">
-      <div class="filters" role="toolbar" aria-label="Filtros">
-        <div id="filter-red" class="chip active" data-type="red"><span style="width:10px;height:10px;border-radius:50%;background:var(--danger);display:inline-block"></span> Bloqueos</div>
-        <div id="filter-orange" class="chip active" data-type="orange"><span style="width:10px;height:10px;border-radius:50%;background:var(--warn);display:inline-block"></span> Incidentes</div>
-        <div id="filter-green" class="chip active" data-type="green"><span style="width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block"></span> Vía libre</div>
-      </div>
-    </div>
-
-    <div class="stats">
-      <div class="stat"><b id="total-count">0</b><small>Total detectadas</small></div>
-      <div class="stat"><b id="active-count">0</b><small>Activas</small></div>
-      <div class="stat"><b id="new-count">0</b><small>Nuevas (últ. minuto)</small></div>
-    </div>
-
-    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="small muted">Lista (últimas 500)</div>
-      <div style="display:flex;gap:6px">
-        <button id="clear-all" class="btn">Limpiar</button>
-        <button id="download-history" class="btn">Descargar historial</button>
-      </div>
-    </div>
-
-    <div id="alerts-list" class="list" aria-live="polite">
-      <div class="small muted">Sin alertas aún</div>
-    </div>
-
-    <div style="margin-top:12px" class="small muted">Estado: <span id="status">Iniciado</span></div>
-  </aside>
-
-  <section class="map-area">
-    <div id="map"></div>
-    <div class="top-controls">
-      <div class="badge" id="last-update">—</div>
-    </div>
-  </section>
-
-</div>
-
-<div class="toast-wrap" id="toasts" aria-live="polite"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- audio -->
-<audio id="sound-block" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
-<audio id="sound-incident" src="https://actions.google.com/sounds/v1/notifications/notification_1.ogg" preload="auto"></audio>
-<audio id="sound-clear" src="https://actions.google.com/sounds/v1/alarms/digital_watch_beep.ogg" preload="auto"></audio>
-
-<script>
-// ---------- CONFIG ----------
-const FEEDS = [
-  { id: "gobierno", url: "https://rss.app/feeds/v1.1/qWyKD6O0BZNvn6ti.json", name: "Gobierno MX" },
-  { id: "transportistas", url: "https://rss.app/feeds/v1.1/xH6Ye0PnCAg4MdMS.json", name: "Transportistas" },
-  { id: "medios", url: "https://rss.app/feeds/v1.1/pgkmg1Pslny7nP4D.json", name: "Medios" },
-  { id: "twitter", url: "https://rss.app/feeds/v1.1/A31TfEriVpwisaKn.json", name: "Twitter" },
-  { id: "locales", url: "https://rss.app/feeds/v1.1/4aUyYkWPD1lDnjrw.json", name: "Locales" }
-];
-const PROXY = "https://api.allorigins.win/get?url=";
-
-// base de ubicaciones
-const ubicaciones = {
-  "km54 méx-toluca": { coords: [19.2600, -99.4900], name: "Méx–Toluca km 54" },
-  "km56 méx-toluca": { coords: [19.2480, -99.4820], name: "Méx–Toluca km 56" },
-  "la marquesa": { coords: [19.3780, -99.5120], name: "La Marquesa" },
-  "san lucas": { coords: [19.7720, -99.1120], name: "San Lucas" },
-  "peñón": { coords: [19.5120, -98.9420], name: "Peñón" },
-  "amozoc": { coords: [19.1830, -98.2100], name: "Amozoc" },
-  "alpuyeca": { coords: [18.9090, -99.2600], name: "Alpuyeca" },
-  "lópez portillo lomas verdes": { coords: [19.5050, -99.2200], name: "López Portillo – Lomas Verdes" },
-  "tapachula": { coords: [14.9070, -92.2490], name: "Tapachula" },
-  "nogales": { coords: [31.3020, -110.9450], name: "Nogales" },
-  "cdmx": { coords: [19.4326, -99.1332], name: "CDMX" },
-  "desconocido": { coords: [23.0, -102.0], name: "Ubicación desconocida" }
-};
-
-// estado
-let alertsList = JSON.parse(localStorage.getItem('alerts_active_v2')||'[]');
-let history = JSON.parse(localStorage.getItem('alerts_history_v2')||'[]');
-let filters = { red:true, orange:true, green:true };
-let lastUpdate = 0;
-
-// mapa
-const map = L.map('map').setView([20.5, -100.5], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-const markerLayer = L.layerGroup().addTo(map);
-
-// util
-const el = id => document.getElementById(id);
-const toasts = el('toasts');
-
-/* toast */
-function showToast(title, body, color){
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.innerHTML = `<div style="display:flex;gap:8px;align-items:center">
-    <div style="width:10px;height:10px;border-radius:50%;background:${color}"></div>
-    <div style="flex:1"><b>${title}</b><div style="font-size:0.85rem;color:var(--muted)">${body}</div></div>
-    <div style="margin-left:8px"><button class="btn" onclick="void(0)">Ver</button></div>
-  </div>`;
-  toasts.appendChild(t);
-  setTimeout(()=> t.remove(), 6000);
-}
-
-/* sonido */
-let soundEnabled = true;
-function playSound(type){
-  if(!soundEnabled) return;
-  const s = { red: el('sound-block'), orange: el('sound-incident'), green: el('sound-clear') }[type];
-  if(s) s.play().catch(()=>{});
-}
-
-/* filtros UI */
-['red','orange','green'].forEach(type=>{
-  const btn = el('filter-'+type);
-  if(!btn) return;
-  btn.onclick = () => {
-    filters[type] = !filters[type];
-    btn.classList.toggle('active', filters[type]);
-    renderAlerts();
-  };
-});
-
-/* botones */
-el('clear-all').onclick = () => { alertsList = []; saveState(); renderAlerts(); updateStatusUI(); };
-el('export-all').onclick = () => downloadCSV(history, 'alertas_todas_historial.csv');
-el('download-history').onclick = () => downloadCSV(history, 'alertas_historial.csv');
-
-/* estado UI */
-function updateStatusUI(){
-  el('active-count').textContent = alertsList.length;
-  el('total-count').textContent = history.length;
-  el('new-count').textContent = alertsList.filter(a=> (Date.now()-a.detectedAt)<60000).length;
-  el('last-update').textContent = lastUpdate ? `Últ: ${new Date(lastUpdate).toLocaleTimeString()}` : '—';
-  el('source-count').textContent = FEEDS.length;
-}
-
-/* CSV export */
-function downloadCSV(rows, name){
-  if(!rows || !rows.length) return alert('No hay datos para exportar.');
-  const header = ['Fecha','Hora','Tipo','Fuente','Ubicación','Título','Descripción'];
-  const lines = [header.join(',')];
-  rows.forEach(r=>{
-    const d = new Date(r.detectedAt);
-    lines.push([d.toLocaleDateString(), d.toLocaleTimeString(), r.type, r.feedSource, `"${(r.locationName||'').replace(/"/g,'""')}"`, `"${(r.title||'').replace(/"/g,'""')}"`, `"${(r.description||'').replace(/"/g,'""')}"`].join(','));
-  });
-  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
-  setTimeout(()=> URL.revokeObjectURL(url), 2000);
-}
-
-/* render lista y mapa */
-function renderAlerts(){
-  const list = el('alerts-list');
-  const visible = alertsList.filter(a => filters[a.type]);
-  if(!visible.length){
-    list.innerHTML = `<div class="small muted">Sin alertas activas</div>`;
-  } else {
-    list.innerHTML = visible.slice(0,500).map(a=>{
-      const color = a.type==='red'? 'var(--danger)' : a.type==='green'? 'var(--success)' : (a.locationKey==='desconocido' ? '#777' : 'var(--warn)');
-      return `<div class="card">
-        <div class="marker" style="background:${color}"></div>
-        <div>
-          <div class="title">${escapeHtml(a.title) || 'Alerta'}</div>
-          <div class="meta">${escapeHtml(a.feedSource)} · ${escapeHtml(a.locationName)} · ${new Date(a.detectedAt).toLocaleTimeString()}</div>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-content">
+        <img src="logo.png" alt="Alertas Carreteras MX" class="brand-logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22 width=%2264%22 height=%2264%22><circle cx=%2232%22 cy=%2232%22 r=%2230%22 fill=%22none%22 stroke=%22%23f44336%22 stroke-width=%224%22/><path d=%22M20,20 L44,44 M44,20 L20,44%22 stroke=%22%23f44336%22 stroke-width=%224%22/></svg>'">
+        <div class="brand">
+          <h1>Alertas Carreteras MX</h1>
+          <small>Operativo en tiempo real — PRO</small>
         </div>
-        <div class="actions">
-          <button class="btn" onclick="zoomToAlert('${a.id}')">Ir</button>
-          <button class="btn" onclick="removeAlert('${a.id}')">✕</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
+      </div>
+    </header>
 
-  markerLayer.clearLayers();
-  visible.forEach(a=>{
-    const loc = (a.coords && Array.isArray(a.coords)) ? { coords: a.coords, name: a.locationName } : (ubicaciones[a.locationKey] || ubicaciones['desconocido']);
-    const color = a.type==='red'? '#f44336' : a.type==='green'? '#4caf50' : (a.locationKey==='desconocido' ? '#777' : '#ff9800');
-    const icon = L.divIcon({
-      className:'',
-      html:`<div style="width:18px;height:18px;border-radius:50%;background:${color};box-shadow:0 2px 8px rgba(0,0,0,0.6);border:2px solid rgba(255,255,255,0.06)"></div>`,
-      iconSize:[18,18], iconAnchor:[9,9]
+    <aside class="sidebar">
+      <div class="controls-row">
+        <div class="filters" role="toolbar" aria-label="Filtros">
+          <div id="filter-red" class="chip active" data-type="red">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--danger);display:inline-block"></span> Bloqueos
+          </div>
+          <div id="filter-orange" class="chip active" data-type="orange">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--warn);display:inline-block"></span> Incidentes
+          </div>
+          <div id="filter-green" class="chip active" data-type="green">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block"></span> Vía libre
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ NUEVO: Filtros por estado y carretera -->
+      <div class="controls-row">
+        <select id="filter-estado" class="btn" style="flex:1">
+          <option value="">Todos los estados</option>
+        </select>
+        <select id="filter-carretera" class="btn" style="flex:1">
+          <option value="">Todas las carreteras</option>
+        </select>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><b id="total-count">0</b><small>Total detectadas</small></div>
+        <div class="stat"><b id="active-count">0</b><small>Activas</small></div>
+        <div class="stat"><b id="new-count">0</b><small>Nuevas (últ. min)</small></div>
+        <div class="stat ignored"><b id="ignored-count">0</b><small>Sin ubicación</small></div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="small muted">Lista (últimas 500)</div>
+        <div style="display:flex;gap:6px">
+          <button id="clear-all" class="btn">Limpiar</button>
+          <button id="download-history" class="btn">Descargar</button>
+        </div>
+      </div>
+
+      <div id="alerts-list" class="list" aria-live="polite">
+        <div class="small muted">Sin alertas aún</div>
+      </div>
+
+      <div style="margin-top:12px" class="small muted">
+        Estado: <span id="status">Iniciado</span> · 
+        <button id="enable-notifications" class="btn" style="padding:4px 8px;font-size:0.8rem;">🔔 Notificaciones</button>
+      </div>
+    </aside>
+
+    <section class="map-area">
+      <div id="map"></div>
+      <div class="top-controls">
+        <div class="badge" id="last-update">—</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+  <!-- Audio -->
+  <audio id="sound-block" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+  <audio id="sound-incident" src="https://actions.google.com/sounds/v1/notifications/notification_1.ogg" preload="auto"></audio>
+  <audio id="sound-clear" src="https://actions.google.com/sounds/v1/alarms/digital_watch_beep.ogg" preload="auto"></audio>
+
+  <script>
+    // ===================================================
+    // ✅ BASE DE DATOS: ESTADOS Y CARRETERAS
+    // ===================================================
+    const estadosDB = [
+      { id: "CDMX", nombre: "Ciudad de México", coords: [19.4326, -99.1332] },
+      { id: "EdoMex", nombre: "Estado de México", coords: [19.3000, -99.6000] },
+      { id: "Gro", nombre: "Guerrero", coords: [17.5580, -99.5440] },
+      { id: "Pue", nombre: "Puebla", coords: [19.0414, -98.2063] },
+      { id: "Ver", nombre: "Veracruz", coords: [19.1800, -96.1300] },
+      { id: "Oax", nombre: "Oaxaca", coords: [17.0732, -96.7266] },
+      { id: "Chis", nombre: "Chiapas", coords: [16.7500, -93.1167] },
+      { id: "Tab", nombre: "Tabasco", coords: [17.9800, -92.9300] },
+      { id: "Cam", nombre: "Campeche", coords: [19.8500, -90.5333] },
+      { id: "Yuc", nombre: "Yucatán", coords: [20.9667, -89.6167] },
+      { id: "Q.Roo", nombre: "Quintana Roo", coords: [20.2000, -87.7500] },
+      { id: "Hgo", nombre: "Hidalgo", coords: [20.1000, -98.7667] },
+      { id: "SLP", nombre: "San Luis Potosí", coords: [22.1500, -100.9833] },
+      { id: "Zac", nombre: "Zacatecas", coords: [22.7833, -102.5833] },
+      { id: "Dur", nombre: "Durango", coords: [24.0333, -104.6500] },
+      { id: "Chih", nombre: "Chihuahua", coords: [28.6333, -106.0667] },
+      { id: "Son", nombre: "Sonora", coords: [29.0667, -110.9500] },
+      { id: "BC", nombre: "Baja California", coords: [31.0000, -115.5000] }
+    ];
+
+    const carreterasDB = [
+      { id: "mex-15", nombre: "México–Nogales", estados: ["CDMX", "EdoMex", "Hgo", "SLP", "Zac", "Dur", "Chih", "Son"] },
+      { id: "mex-95", nombre: "México–Acapulco", estados: ["CDMX", "EdoMex", "Gro"] },
+      { id: "mex-190", nombre: "México–Oaxaca", estados: ["CDMX", "Pue", "Oax"] },
+      { id: "mex-1d", nombre: "Tijuana–Ensenada", estados: ["BC"] },
+      { id: "mex-200", nombre: "Costera Pacífico", estados: ["Gro", "Oax", "Chis", "Cam"] },
+      { id: "mex-180", nombre: "Costera Golfo", estados: ["Ver", "Tab", "Cam", "Yuc", "Q.Roo"] }
+    ];
+
+    // ===================================================
+    // ✅ CONFIGURACIÓN
+    // ===================================================
+    const FEEDS = [
+      { id: "gobierno", url: "https://rss.app/feeds/v1.1/qWyKD6O0BZNvn6ti.json", name: "Gobierno MX" },
+      { id: "transportistas", url: "https://rss.app/feeds/v1.1/xH6Ye0PnCAg4MdMS.json", name: "Transportistas" },
+      { id: "medios", url: "https://rss.app/feeds/v1.1/pgkmg1Pslny7nP4D.json", name: "Medios" },
+      { id: "twitter", url: "https://rss.app/feeds/v1.1/A31TfEriVpwisaKn.json", name: "Twitter" },
+      { id: "locales", url: "https://rss.app/feeds/v1.1/4aUyYkWPD1lDnjrw.json", name: "Locales" }
+    ];
+    const PROXY = "https://api.allorigins.win/get?url=";
+
+    const ubicaciones = {
+      "km54 méx-toluca": { coords: [19.2600, -99.4900], name: "Méx–Toluca km 54" },
+      "km56 méx-toluca": { coords: [19.2480, -99.4820], name: "Méx–Toluca km 56" },
+      "la marquesa": { coords: [19.3780, -99.5120], name: "La Marquesa" },
+      "san lucas": { coords: [19.7720, -99.1120], name: "San Lucas" },
+      "peñón": { coords: [19.5120, -98.9420], name: "Peñón" },
+      "amozoc": { coords: [19.1830, -98.2100], name: "Amozoc" },
+      "alpuyeca": { coords: [18.9090, -99.2600], name: "Alpuyeca" },
+      "lópez portillo lomas verdes": { coords: [19.5050, -99.2200], name: "López Portillo – Lomas Verdes" },
+      "tapachula": { coords: [14.9070, -92.2490], name: "Tapachula" },
+      "nogales": { coords: [31.3020, -110.9450], name: "Nogales" },
+      "cdmx": { coords: [19.4326, -99.1332], name: "CDMX" },
+      "desconocido": { coords: [23.0, -102.0], name: "Ubicación aproximada" }
+    };
+
+    const tramos = {
+      "mex-toluca": {
+        km0: { name: "CDMX", coords: [19.4326, -99.1332] },
+        km64: { name: "Toluca", coords: [19.2700, -99.6200] }
+      },
+      "mex-puebla": {
+        km0: { name: "CDMX", coords: [19.4326, -99.1332] },
+        km120: { name: "Puebla", coords: [19.0414, -98.2063] }
+      }
+    };
+
+    let alertsList = JSON.parse(localStorage.getItem('alerts_active_v2')||'[]');
+    let history = JSON.parse(localStorage.getItem('alerts_history_v2')||'[]');
+    let ignoredCount = 0;
+    let filters = { red:true, orange:true, green:true };
+    let selectedEstado = '';
+    let selectedCarretera = '';
+    let heatmapEnabled = true;
+    let satelliteView = false;
+    let lastUpdate = 0;
+    let geocodeCache = JSON.parse(localStorage.getItem('geocode_cache_v1') || '{}');
+
+    // ===================================================
+    // ✅ MAPA
+    // ===================================================
+    const map = L.map('map').setView([20.5, -100.5], 5);
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 });
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
+
+    const markerCluster = L.markerClusterGroup({
+      maxClusterRadius: 40,
+      spiderfyOnMaxZoom: false,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true
     });
-    const m = L.marker(loc.coords, {icon}).addTo(markerLayer);
-    m.bindPopup(`<b>${escapeHtml(a.title)}</b><br>${escapeHtml(a.feedSource)}<br>📍 ${escapeHtml(a.locationName)}<br><small>${new Date(a.detectedAt).toLocaleString()}</small>`);
-  });
 
-  updateStatusUI();
-}
+    const heatRed = L.heatLayer([], { 
+      radius: 30, blur: 25, maxZoom: 14, minOpacity: 0.4, gradient: {0.4: '#ffcccc', 0.65: '#ff6666', 1: '#cc0000'}
+    });
+    const heatOrange = L.heatLayer([], { 
+      radius: 25, blur: 20, maxZoom: 14, minOpacity: 0.3, gradient: {0.4: '#ffe0b2', 0.7: '#ff9800', 1: '#e65100'}
+    });
 
-/* zoom / remove */
-function zoomToAlert(id){
-  const a = alertsList.find(x=>x.id===id);
-  if(!a) return;
-  const coords = a.coords || (ubicaciones[a.locationKey] && ubicaciones[a.locationKey].coords) || [19.4326, -99.1332];
-  map.setView(coords, 12, {animate:true});
-}
-
-function removeAlert(id){
-  alertsList = alertsList.filter(a=>a.id!==id);
-  saveState();
-  renderAlerts();
-  updateStatusUI();
-}
-
-/* persistencia */
-function saveState(){
-  try{
-    localStorage.setItem('alerts_active_v2', JSON.stringify(alertsList));
-    localStorage.setItem('alerts_history_v2', JSON.stringify(history));
-  }catch(e){}
-}
-
-/* hashing unicode-safe */
-async function uuidFromString(str){
-  const enc = new TextEncoder().encode(str);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  const hex = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  return hex.slice(0,16);
-}
-
-/* sanitize simple */
-function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
-
-/* ---------- DETECCIÓN PRECISIÓN MEDIA ---------- */
-function normalizeString(s){
-  return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ñ/g,'n');
-}
-
-function getLocationFromItem(item){
-  // 1) coordinates explicit
-  if(item.latitude && item.longitude){
-    return { coords: [Number(item.latitude), Number(item.longitude)], name: item.title || 'Posición' };
-  }
-  if(item.lat && item.lon) return { coords: [Number(item.lat), Number(item.lon)], name: item.title || 'Posición' };
-
-  const text = (item.title||'') + ' ' + (item.description||'');
-  const lower = text.toLowerCase();
-
-  // km detection
-  const kmMatch = lower.match(/\bkm\.?\s*([0-9]{1,3})\b/);
-  if(kmMatch){
-    const km = Number(kmMatch[1]);
-    // heurística Mexico-Toluca
-    if(km >= 40 && km <= 70){
-      return { key: km <= 55 ? "km54 méx-toluca" : "km56 méx-toluca" };
+    osm.addTo(map);
+    markerCluster.addTo(map);
+    if (heatmapEnabled) {
+      heatRed.addTo(map);
+      heatOrange.addTo(map);
     }
-    // heurística Mexico-Puebla
-    if(km >= 10 && km <= 120){
-      if(km < 40) return { key: "peñón" };
-      if(km < 60) return { key: "amozoc" };
-      return { key: "cdmx" };
+
+    const el = id => document.getElementById(id);
+    const toasts = el('toasts');
+
+    // ===================================================
+    // ✅ FUNCIONES AUXILIARES
+    // ===================================================
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'<','>':'>','"':'&quot;',"'":"&#39;"}[c])); }
+    function normalizeString(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+
+    async function uuidFromString(str){
+      const enc = new TextEncoder().encode(str);
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      const hex = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      return hex.slice(0,16);
     }
-  }
 
-  // specific places (longest-first)
-  const keys = Object.keys(ubicaciones).sort((a,b)=>b.length-a.length);
-  for(const k of keys){
-    if(k === 'desconocido') continue;
-    const name = k.toLowerCase();
-    if(lower.indexOf(name) !== -1) return { key: k };
-    const pretty = normalizeString(ubicaciones[k].name).toLowerCase();
-    if(normalizeString(lower).indexOf(pretty) !== -1) return { key: k };
-  }
+    function showToast(title, body, color){
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.innerHTML = `<div style="display:flex;gap:8px;align-items:center">
+        <div style="width:10px;height:10px;border-radius:50%;background:${color}"></div>
+        <div style="flex:1"><b>${escapeHtml(title)}</b><div style="font-size:0.85rem;color:var(--muted)">${escapeHtml(body)}</div></div>
+        <div style="margin-left:8px"><button class="btn" onclick="void(0)">Ver</button></div>
+      </div>`;
+      toasts.appendChild(t);
+      setTimeout(()=> t.remove(), 6000);
+    }
 
-  // city / state keywords
-  if(/toluca/.test(lower)) return { key: "km54 méx-toluca" };
-  if(/cuernavaca/.test(lower)) return { key: "alpuyeca" };
-  if(/puebla/.test(lower)) return { key: "amozoc" };
-  if(/cdmx|ciudad de mexico|ciudad de méxico|edomex|edo mex/.test(lower)) return { key: "cdmx" };
-  if(/tapachula/.test(lower)) return { key: "tapachula" };
-  if(/nogales/.test(lower)) return { key: "nogales" };
+    let soundEnabled = true;
+    function playSound(type){
+      if(!soundEnabled) return;
+      const s = { red: el('sound-block'), orange: el('sound-incident'), green: el('sound-clear') }[type];
+      if(s) s.play().catch(()=>{});
+    }
 
-  // fallback → desconocido
-  return { key: "desconocido" };
-}
+    function coordsFromKmOnRoute(km, routeKey) {
+      const tramo = tramos[routeKey];
+      if (!tramo) return null;
+      const kmin = Math.min(...Object.keys(tramo).map(k => parseFloat(k.replace('km',''))));
+      const kmmax = Math.max(...Object.keys(tramo).map(k => parseFloat(k.replace('km',''))));
+      if (km < kmin || km > kmmax) return null;
+      const [k1, k2] = Object.keys(tramo).map(k => parseFloat(k.replace('km',''))).sort((a,b)=>a-b);
+      const p1 = tramo[`km${k1}`], p2 = tramo[`km${k2}`];
+      const ratio = (km - k1) / (kmmax - kmin);
+      return [
+        p1.coords[0] + ratio * (p2.coords[0] - p1.coords[0]),
+        p1.coords[1] + ratio * (p2.coords[1] - p1.coords[1])
+      ];
+    }
 
-/* ---------- Parser robusto via proxy (JSON o XML) ---------- */
-async function fetchFeedViaProxy(feedUrl){
-  const proxyUrl = PROXY + encodeURIComponent(feedUrl);
-  const respText = await fetch(proxyUrl).then(r => r.text());
-  try{
-    const wrapper = JSON.parse(respText);
-    if(wrapper && wrapper.contents){
-      // try parse contents as JSON
-      try{ return JSON.parse(wrapper.contents); }
-      catch(e){
-        // if not JSON, try to parse as XML using DOMParser for <item>
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(wrapper.contents, "text/xml");
-        if(doc && doc.getElementsByTagName){
-          // build items array from <item> nodes
-          const items = [];
-          const nodes = doc.getElementsByTagName('item');
-          for(let i=0;i<nodes.length;i++){
-            const n = nodes[i];
-            const title = (n.getElementsByTagName('title')[0]||{}).textContent || '';
-            const description = (n.getElementsByTagName('description')[0]||{}).textContent || '';
-            const pubDate = (n.getElementsByTagName('pubDate')[0]||{}).textContent || '';
-            const lat = (n.getElementsByTagName('geo:lat')[0]||{}).textContent || (n.getElementsByTagName('latitude')[0]||{}).textContent;
-            const lon = (n.getElementsByTagName('geo:long')[0]||{}).textContent || (n.getElementsByTagName('longitude')[0]||{}).textContent;
-            items.push({ title, description, pubDate, latitude: lat, longitude: lon });
+    async function geocodeLocation(text) {
+      const key = normalizeString(text).substring(0, 100);
+      const now = Date.now();
+      const cached = geocodeCache[key];
+      if (cached && (now - cached.ts) < 86400000) {
+        return { coords: cached.coords, name: cached.name };
+      }
+
+      try {
+        const kmMatch = text.match(/\bkm\.?\s*(\d{1,3})\b/i);
+        if (kmMatch) {
+          const km = parseFloat(kmMatch[1]);
+          const lower = text.toLowerCase();
+          let route = null;
+          if (/toluca|méx-toluca|méxico-toluca/.test(lower)) route = 'mex-toluca';
+          else if (/puebla|amozoc|peñón/.test(lower)) route = 'mex-puebla';
+          if (route) {
+            const coords = coordsFromKmOnRoute(km, route);
+            if (coords) {
+              const name = `Tramo ${route.toUpperCase()} km${km}`;
+              geocodeCache[key] = { coords, name, ts: now };
+              localStorage.setItem('geocode_cache_v1', JSON.stringify(geocodeCache));
+              return { coords, name };
+            }
           }
-          return { items };
         }
-        // fallback return raw
-        return { raw: wrapper.contents };
+
+        if (text.length > 10 && !/bloqueo|incidente|vía libre|alerta|reporte/i.test(text)) {
+          const query = encodeURIComponent(text.substring(0, 100));
+          const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&addressdetails=1&accept-language=es`;
+          const resp = await fetch(url, {
+            headers: { "User-Agent": "AlertasCarreterasMX/1.0 (karlossxt@gmail.com)" }
+          });
+          const data = await resp.json();
+          if (data && data[0]) {
+            const coords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            const name = data[0].display_name.split(',')[0] || 'Ubicación geocodificada';
+            geocodeCache[key] = { coords, name, ts: now };
+            localStorage.setItem('geocode_cache_v1', JSON.stringify(geocodeCache));
+            return { coords, name };
+          }
+        }
+      } catch (e) {
+        console.warn("Geocodificación fallida:", e);
+      }
+      return null;
+    }
+
+    // ===================================================
+    // ✅ EXTRACCIÓN DE UBICACIÓN + ESTADO/CARRETERA
+    // ===================================================
+    function getLocationAndRoute(item) {
+      const text = (item.title || '') + ' ' + (item.description || '');
+      const lower = text.toLowerCase();
+
+      // 1. Coordenadas explícitas
+      if ((item.latitude && item.longitude) || (item.lat && item.lon)) {
+        const coords = [Number(item.latitude || item.lat), Number(item.longitude || item.lon)];
+        return { coords, name: 'Coordenadas GPS', hasLocation: true };
+      }
+
+      // 2. Coincidencia en ubicaciones base
+      const keys = Object.keys(ubicaciones).filter(k => k !== 'desconocido').sort((a,b)=>b.length-a.length);
+      for (const k of keys) {
+        if (lower.includes(k) || normalizeString(lower).includes(normalizeString(k))) {
+          return { key: k, hasLocation: true };
+        }
+      }
+
+      // 3. Palabras clave geográficas
+      const cityKeywords = [
+        { kw: /toluca|km\s*\d{1,3}.*(méx.*toluca|méxico.*toluca)/i, key: "km54 méx-toluca" },
+        { kw: /cuernavaca|alpuyeca/i, key: "alpuyeca" },
+        { kw: /puebla|amozoc|peñón/i, key: "amozoc" },
+        { kw: /cdmx|ciudad de méxico|méxico df|edomex|estado de méxico/i, key: "cdmx" },
+        { kw: /tapachula/i, key: "tapachula" },
+        { kw: /nogales/i, key: "nogales" },
+        { kw: /la marquesa/i, key: "la marquesa" },
+        { kw: /san lucas/i, key: "san lucas" },
+        { kw: /lomas verdes|lópez portillo/i, key: "lópez portillo lomas verdes" }
+      ];
+
+      for (const { kw, key } of cityKeywords) {
+        if (kw.test(lower)) {
+          return { key, hasLocation: true };
+        }
+      }
+
+      return { key: "desconocido", rawText: text, hasLocation: false };
+    }
+
+    // ===================================================
+    // ✅ RENDER
+    // ===================================================
+    function renderAlerts() {
+      const list = el('alerts-list');
+      
+      // ✅ FILTRO POR TIPO + ESTADO + CARRETERA
+      const visible = alertsList.filter(a => {
+        if (!filters[a.type]) return false;
+        if (selectedEstado && !a.estados?.includes(selectedEstado)) return false;
+        if (selectedCarretera && a.carretera !== selectedCarretera) return false;
+        return true;
+      });
+      
+      if (!visible.length) {
+        list.innerHTML = `<div class="small muted">Sin alertas con ubicación</div>`;
+      } else {
+        list.innerHTML = visible.slice(0,500).map(a => {
+          const colorMap = { red: 'var(--danger)', orange: 'var(--warn)', green: 'var(--success)' };
+          const color = colorMap[a.type] || '#777';
+          return `<div class="card">
+            <div class="marker" style="background:${color}"></div>
+            <div>
+              <div class="title">${escapeHtml(a.title) || 'Alerta'}</div>
+              <div class="meta">${escapeHtml(a.feedSource)} · ${escapeHtml(a.locationName)} · ${new Date(a.detectedAt).toLocaleTimeString()}</div>
+            </div>
+            <div class="actions">
+              <button class="btn" onclick="zoomToAlert('${a.id}')">Ir</button>
+              <button class="btn" onclick="shareWhatsApp('${a.id}')">📱</button>
+              <button class="btn" onclick="removeAlert('${a.id}')">✕</button>
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      markerCluster.clearLayers();
+      heatRed.setLatLngs([]);
+      heatOrange.setLatLngs([]);
+
+      visible.forEach(a => {
+        let coords = a.coords;
+        let name = a.locationName;
+
+        if (!coords && a.locationKey) {
+          const locRef = ubicaciones[a.locationKey] || ubicaciones['desconocido'];
+          coords = locRef.coords;
+          name = locRef.name;
+        }
+
+        if (!coords || coords.length !== 2 || !isFinite(coords[0]) || !isFinite(coords[1])) return;
+
+        const colorMap = { red: '#f44336', orange: '#ff9800', green: '#4caf50' };
+        const color = colorMap[a.type] || '#777';
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};box-shadow:0 2px 8px rgba(0,0,0,0.6);border:2px solid rgba(255,255,255,0.06)"></div>`,
+          iconSize: [18,18], iconAnchor: [9,9]
+        });
+
+        const marker = L.marker(coords, { icon });
+        marker.bindPopup(`
+          <b>${escapeHtml(a.title)}</b><br>
+          <small>${escapeHtml(a.feedSource)} · 📍 ${escapeHtml(name)}</small><br>
+          <small>${new Date(a.detectedAt).toLocaleString()}</small><br>
+          <button onclick="shareWhatsApp('${a.id}')" style="margin-top:8px;background:#25D366;color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.85rem;">📱 WhatsApp</button>
+        `);
+        markerCluster.addLayer(marker);
+
+        if (a.type !== 'green') {
+          const ageMin = (Date.now() - a.detectedAt) / 60000;
+          const weight = Math.max(0.1, 1 - ageMin / 30);
+          const point = [coords[0], coords[1], weight * (a.type === 'red' ? 2 : 1)];
+          if (a.type === 'red') heatRed.addLatLng(point);
+          else if (a.type === 'orange') heatOrange.addLatLng(point);
+        }
+      });
+
+      heatRed.setOpacity(heatmapEnabled && filters.red ? 0.8 : 0);
+      heatOrange.setOpacity(heatmapEnabled && filters.orange ? 0.6 : 0);
+
+      updateStatusUI();
+    }
+
+    function zoomToAlert(id) {
+      const a = alertsList.find(x => x.id === id);
+      if (!a) return;
+      let coords = a.coords;
+      if (!coords && a.locationKey) {
+        const locRef = ubicaciones[a.locationKey] || ubicaciones['desconocido'];
+        coords = locRef.coords;
+      }
+      if (coords && coords.length === 2 && isFinite(coords[0]) && isFinite(coords[1])) {
+        map.setView(coords, 12, { animate: true });
       }
     }
-  }catch(e){
-    // respText might be direct JSON or raw
-    try{ return JSON.parse(respText); } catch(e2){
-      // fallback try parsing as XML
-      try{
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(respText, "text/xml");
-        const items = [];
-        const nodes = doc.getElementsByTagName('item');
-        for(let i=0;i<nodes.length;i++){
-          const n = nodes[i];
-          const title = (n.getElementsByTagName('title')[0]||{}).textContent || '';
-          const description = (n.getElementsByTagName('description')[0]||{}).textContent || '';
-          const pubDate = (n.getElementsByTagName('pubDate')[0]||{}).textContent || '';
-          const lat = (n.getElementsByTagName('geo:lat')[0]||{}).textContent || (n.getElementsByTagName('latitude')[0]||{}).textContent;
-          const lon = (n.getElementsByTagName('geo:long')[0]||{}).textContent || (n.getElementsByTagName('longitude')[0]||{}).textContent;
-          items.push({ title, description, pubDate, latitude: lat, longitude: lon });
+
+    function removeAlert(id) {
+      alertsList = alertsList.filter(a => a.id !== id);
+      saveState();
+      renderAlerts();
+    }
+
+    // ✅ WHATSAPP
+    function generateWhatsAppLink(alert) {
+      const msg = `🚨 *ALERTA VIAL CRÍTICA*\n\n` +
+                  `📍 *Ubicación:* ${alert.locationName}\n` +
+                  `ℹ️ *Detalle:* ${alert.title}\n` +
+                  `🕒 *Hora:* ${new Date(alert.detectedAt).toLocaleString()}\n` +
+                  `📡 *Fuente:* ${alert.feedSource}\n\n` +
+                  `🔗 Más info: https://carreteras.mx`;
+      return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    }
+
+    function shareWhatsApp(id) {
+      const alert = alertsList.find(a => a.id === id);
+      if (!alert) return;
+      const url = generateWhatsAppLink(alert);
+      window.open(url, '_blank');
+    }
+
+    // ===================================================
+    // ✅ NOTIFICACIONES PUSH
+    // ===================================================
+    function requestPushPermission() {
+      if (Notification.permission === 'granted') return Promise.resolve(true);
+      if (Notification.permission === 'denied') {
+        alert('⚠️ Las notificaciones están bloqueadas. Habilita en ajustes de tu navegador.');
+        return Promise.resolve(false);
+      }
+      return Notification.requestPermission().then(permission => {
+        return permission === 'granted';
+      });
+    }
+
+    function sendPushNotification(alert) {
+      if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
+      
+      const title = alert.type === 'red' ? '🚨 BLOQUEO CRÍTICO' : 
+                    alert.type === 'orange' ? '⚠️ INCIDENTE' : '✅ VÍA LIBRE';
+      const body = `${alert.locationName} · ${alert.feedSource}`;
+      
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, {
+          body,
+          icon: 'logo.png',
+          badge: 'logo.png',
+          tag: 'alerta-' + alert.id,
+          requireInteraction: alert.type === 'red',
+          data: { id: alert.id, type: alert.type }
+        });
+      }).catch(console.warn);
+    }
+
+    // Registrar Service Worker (si no existe, creamos uno dinámico)
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        self.addEventListener('push', function(event) {
+          const data = event.data?.json() || {};
+          const title = data.title || 'Alerta Carreteras MX';
+          const options = {
+            body: data.body || '',
+            icon: 'logo.png',
+            badge: 'logo.png',
+            tag: data.tag || 'alerta',
+            requireInteraction: data.requireInteraction || false,
+            actions: [{ action: 'map', title: 'Ver mapa' }]
+          };
+          event.waitUntil(self.registration.showNotification(title, options));
+        });
+        
+        self.addEventListener('notificationclick', function(event) {
+          event.notification.close();
+          if (event.action === 'map' || !event.action) {
+            clients.openWindow('./alertas-carreteras-mx-pro-definitivo.html');
+          }
+        });
+      `;
+      
+      const blob = new Blob([swCode], {type: 'application/javascript'});
+      const swURL = URL.createObjectURL(blob);
+      
+      navigator.serviceWorker.register(swURL).catch(console.warn);
+    }
+
+    // ===================================================
+    // ✅ ACTUALIZACIÓN DE ALERTAS
+    // ===================================================
+    async function updateAlerts() {
+      el('status').textContent = 'Buscando nuevas alertas...';
+      try {
+        const results = await Promise.all(FEEDS.map(f => 
+          fetchFeedViaProxy(f.url).then(data => ({ feedName: f.name, data }))
+        ));
+        lastUpdate = Date.now();
+        let added = 0;
+        let newIgnored = 0;
+
+        for (const res of results) {
+          let items = [];
+          const data = res.data;
+          if (Array.isArray(data.items)) items = data.items;
+          else if (data.feed && Array.isArray(data.feed.items)) items = data.feed.items;
+          else if (data.raw) {
+            const matches = data.raw.match(/<item[\s\S]*?<\/item>/gi) || [];
+            items = matches.map(block => {
+              const t = (block.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '';
+              const d = (block.match(/<description[^>]*>([\s\S]*?)<\/description>/i) || [])[1] || '';
+              const lat = (block.match(/<geo:lat[^>]*>([\s\S]*?)<\/geo:lat>/i) || [])[1];
+              const lon = (block.match(/<geo:long[^>]*>([\s\S]*?)<\/geo:long>/i) || [])[1] || 
+                          (block.match(/<geo:lon[^>]*>([\s\S]*?)<\/geo:lon>/i) || [])[1];
+              return { title: t, description: d, latitude: lat, longitude: lon };
+            });
+          }
+
+          for (const item of items) {
+            const title = (item.title || '').trim();
+            const description = (item.description || '').trim();
+            const pub = item.pubDate || item.isoDate || Date.now();
+            if (!title && !description) continue;
+
+            const text = (title + ' ' + description).toLowerCase();
+            let type = 'orange';
+            if (/bloqueo|cierre|protesta|reten|manifestaci|candado/i.test(text)) type = 'red';
+            else if (/libre|reabierto|fluye|restaurad|normaliz/i.test(text)) type = 'green';
+
+            let loc = getLocationAndRoute(item);
+            let locationKey = loc.key;
+            let coords = loc.coords;
+            let locationName = loc.name || (ubicaciones[locationKey]?.name || 'Desconocido');
+            let hasLocation = loc.hasLocation;
+
+            // Geocodificación
+            if (!hasLocation && loc.rawText) {
+              const geo = await geocodeLocation(loc.rawText);
+              if (geo) {
+                coords = geo.coords;
+                locationName = geo.name;
+                hasLocation = true;
+                locationKey = null;
+              }
+            }
+
+            // ✅ INFERIR ESTADO Y CARRETERA
+            let estados = [];
+            let carretera = '';
+
+            // Por texto
+            for (const e of estadosDB) {
+              if (text.includes(e.id.toLowerCase()) || text.includes(e.nombre.toLowerCase())) {
+                estados.push(e.id);
+              }
+            }
+
+            for (const c of carreterasDB) {
+              if (text.includes(c.id.toLowerCase()) || text.includes(c.nombre.toLowerCase())) {
+                carretera = c.id;
+                estados = [...new Set([...estados, ...c.estados])];
+                break;
+              }
+            }
+
+            // Por ubicación conocida
+            if (locationKey && locationKey !== 'desconocido') {
+              const known = {
+                'km54 méx-toluca': ['CDMX', 'EdoMex'],
+                'cdmx': ['CDMX'],
+                'amozoc': ['Pue'],
+                'tapachula': ['Chis'],
+                'nogales': ['Son'],
+                'la marquesa': ['EdoMex']
+              };
+              estados = known[locationKey] || [];
+            }
+
+            // ✅ VALIDAR UBICACIÓN
+            const hasValidLocation = 
+              (hasLocation && coords && coords.length === 2 && isFinite(coords[0]) && isFinite(coords[1])) ||
+              (hasLocation && locationKey && locationKey !== 'desconocido');
+
+            const rawId = `${title}|${description}|${res.feedName}|${pub}`;
+            const id = await uuidFromString(rawId);
+            if (history.some(h => h.id === id)) continue;
+
+            const detectedAt = (new Date(pub)).getTime() || Date.now();
+            const alertObj = { id, title, description, feedSource: res.feedName, type, locationKey, locationName, detectedAt, coords, estados, carretera };
+
+            if (!hasValidLocation) {
+              alertObj.ignored = true;
+              history.unshift(alertObj);
+              newIgnored++;
+              continue;
+            }
+
+            // ✅ SOLO LAS CON UBICACIÓN VÁLIDA
+            history.unshift(alertObj);
+            alertsList.unshift(alertObj);
+            added++;
+
+            // Sonido y toast
+            playSound(type);
+            showToast(
+              type === 'red' ? '🚨 Bloqueo detectado' : 
+              type === 'green' ? '✅ Vía libre' : '⚠️ Incidente reportado',
+              `${alertObj.locationName} · ${alertObj.feedSource}`,
+              type === 'red' ? '#f44336' : type === 'green' ? '#4caf50' : '#ff9800'
+            );
+
+            // ✅ Notificación push para bloqueos
+            if (type === 'red') {
+              sendPushNotification(alertObj);
+            }
+
+            // Zoom automático para bloqueos
+            if (type === 'red') {
+              const zcoords = coords || (ubicaciones[locationKey]?.coords) || [19.4326, -99.1332];
+              if (zcoords && zcoords.length === 2) {
+                map.setView(zcoords, 12, { animate: true });
+              }
+            }
+          }
         }
-        if(items.length) return { items };
-      }catch(e3){}
+
+        ignoredCount += newIgnored;
+        const now = Date.now();
+        alertsList = alertsList.filter(a => {
+          const maxAge = a.type === 'red' ? 240 * 60000 : 
+                         a.type === 'green' ? 60 * 60000 : 120 * 60000;
+          return (now - a.detectedAt) < maxAge;
+        }).slice(0, 500);
+        history = history.slice(0, 5000);
+
+        saveState();
+        renderAlerts();
+        el('status').textContent = `✔️ +${added} nuevas (${newIgnored} sin ubicación)`;
+      } catch (e) {
+        console.error(e);
+        el('status').textContent = `❌ Error: ${e.message?.substring(0,40) || 'falló actualización'}`;
+      }
+    }
+
+    async function fetchFeedViaProxy(feedUrl) {
+      const proxyUrl = PROXY + encodeURIComponent(feedUrl);
+      const resp = await fetch(proxyUrl);
+      const respText = await resp.text();
+      try {
+        const wrapper = JSON.parse(respText);
+        if (wrapper?.contents) return JSON.parse(wrapper.contents);
+      } catch (e) {}
       return { raw: respText };
     }
-  }
-}
 
-/* ---------- MAIN: actualizar alertas ---------- */
-async function updateAlerts(){
-  el('status').textContent = 'Actualizando...';
-  try{
-    const results = await Promise.all(FEEDS.map(f => fetchFeedViaProxy(f.url).then(data => ({ feedName: f.name, data })) ));
-    lastUpdate = Date.now();
-    let added = 0;
-
-    for(const res of results){
-      const feedName = res.feedName;
-      const data = res.data;
-      if(!data) continue;
-      let items = [];
-      if(Array.isArray(data.items)) items = data.items;
-      else if(data.feed && Array.isArray(data.feed.items)) items = data.feed.items;
-      else if(data.raw) {
-        // fallback: try <item> via regex (very fallback)
-        const raw = data.raw;
-        const matches = raw.match(/<item[\s\S]*?<\/item>/gi);
-        if(matches){
-          items = matches.map(block => {
-            const t = (block.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1] || '';
-            const d = (block.match(/<description[^>]*>([\s\S]*?)<\/description>/i)||[])[1] || '';
-            const lat = (block.match(/<geo:lat[^>]*>([\s\S]*?)<\/geo:lat>/i)||[])[1];
-            const lon = (block.match(/<geo:long[^>]*>([\s\S]*?)<\/geo:long>/i)||[])[1] || (block.match(/<geo:lon[^>]*>([\s\S]*?)<\/geo:lon>/i)||[])[1];
-            return { title: t, description: d, latitude: lat, longitude: lon };
-          });
-        }
-      }
-
-      // process items sequentially because uuidFromString is async
-      for(const item of items){
-        const title = (item.title||item.link||'Alerta').trim();
-        const description = (item.description||item.content||'').trim();
-        const pub = item.pubDate || item.isoDate || Date.now();
-
-        const text = (title + ' ' + description).toLowerCase();
-        let type = 'orange';
-        if(/bloqueo|cierre|protesta|reten|manifestaci/i.test(text)) type = 'red';
-        if(/libre|reabierto|fluye|restaurad/i.test(text)) type = 'green';
-
-        // location heuristic
-        const loc = getLocationFromItem(item);
-        let locationKey = loc.key;
-        let coords = loc.coords;
-        if(item.latitude && item.longitude){
-          coords = [Number(item.latitude), Number(item.longitude)];
-        } else if(item.lat && item.lon){
-          coords = [Number(item.lat), Number(item.lon)];
-        }
-
-        const locationName = coords ? `Coordenadas (${coords[0].toFixed(4)}, ${coords[1].toFixed(4)})` : (ubicaciones[locationKey]?.name || 'Desconocida');
-
-        const rawId = (title || '') + '|' + (description || '') + '|' + feedName + '|' + (pub || Date.now());
-        const id = await uuidFromString(rawId);
-
-        if(history.some(h => h.id === id)) continue;
-
-        const detectedAt = (new Date(pub)).getTime() || Date.now();
-
-        const alertObj = { id, title, description, feedSource: feedName, type, locationKey, locationName, detectedAt, coords };
-        history.unshift(alertObj);
-        alertsList.unshift(alertObj);
-        added++;
-
-        playSound(type);
-        showToast(type==='red' ? 'Bloqueo detectado' : type==='green' ? 'Vía libre' : 'Incidente', `${alertObj.locationName} · ${alertObj.feedSource}`, type==='red' ? '#f44336' : type==='green' ? '#4caf50' : '#ff9800');
-
-        if(type === 'red'){
-          const zcoords = coords || (ubicaciones[locationKey] && ubicaciones[locationKey].coords) || [19.4326,-99.1332];
-          map.setView(zcoords, 12, {animate:true});
-        }
-      }
+    function updateStatusUI() {
+      el('active-count').textContent = alertsList.length;
+      el('total-count').textContent = history.filter(h => !h.ignored).length;
+      el('new-count').textContent = alertsList.filter(a => (Date.now() - a.detectedAt) < 60000).length;
+      el('ignored-count').textContent = ignoredCount;
+      el('last-update').textContent = lastUpdate ? `Últ: ${new Date(lastUpdate).toLocaleTimeString()}` : '—';
     }
 
-    // expire alerts
-    const now = Date.now();
-    alertsList = alertsList.filter(a => {
-      const maxAge = a.type==='red' ? 240*60000 : a.type==='green' ? 60*60000 : 120*60000;
-      return (now - a.detectedAt) < maxAge;
+    function saveState() {
+      try {
+        localStorage.setItem('alerts_active_v2', JSON.stringify(alertsList));
+        localStorage.setItem('alerts_history_v2', JSON.stringify(history));
+      } catch (e) {}
+    }
+
+    // ===================================================
+    // ✅ INICIALIZACIÓN
+    // ===================================================
+    ignoredCount = history.filter(h => h.ignored).length;
+
+    // ✅ LLENAR DROPDOWNS
+    const estadoSelect = el('filter-estado');
+    const carreteraSelect = el('filter-carretera');
+    
+    estadosDB.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.nombre;
+      estadoSelect.appendChild(opt);
+    });
+    
+    carreterasDB.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nombre;
+      carreteraSelect.appendChild(opt);
     });
 
-    alertsList = alertsList.slice(0,500);
-    history = history.slice(0,5000);
+    estadoSelect.onchange = () => {
+      selectedEstado = estadoSelect.value;
+      renderAlerts();
+    };
+    
+    carreteraSelect.onchange = () => {
+      selectedCarretera = carreteraSelect.value;
+      renderAlerts();
+    };
 
-    saveState();
+    // ✅ CONTROLES EXISTENTES
+    const heatmapToggle = document.createElement('button');
+    heatmapToggle.className = 'btn';
+    heatmapToggle.textContent = 'Heatmap: ON';
+    heatmapToggle.onclick = () => {
+      heatmapEnabled = !heatmapEnabled;
+      heatmapToggle.textContent = `Heatmap: ${heatmapEnabled ? 'ON' : 'OFF'}`;
+      renderAlerts();
+    };
+
+    const layerToggle = document.createElement('button');
+    layerToggle.className = 'btn';
+    layerToggle.textContent = 'Satélite: OFF';
+    layerToggle.onclick = () => {
+      satelliteView = !satelliteView;
+      map.removeLayer(osm);
+      map.removeLayer(satellite);
+      if (satelliteView) {
+        satellite.addTo(map);
+        layerToggle.textContent = 'Satélite: ON';
+      } else {
+        osm.addTo(map);
+        layerToggle.textContent = 'Satélite: OFF';
+      }
+    };
+
+    document.querySelector('.top-controls').prepend(layerToggle, heatmapToggle);
+
+    ['red','orange','green'].forEach(type => {
+      const btn = el('filter-'+type);
+      if (btn) {
+        btn.onclick = () => {
+          filters[type] = !filters[type];
+          btn.classList.toggle('active', filters[type]);
+          renderAlerts();
+        };
+      }
+    });
+
+    el('clear-all').onclick = () => { 
+      alertsList = []; 
+      saveState(); 
+      renderAlerts(); 
+      updateStatusUI(); 
+    };
+
+    el('download-history').onclick = () => {
+      if (!history.length) return alert('No hay historial.');
+      const csvContent = "text/csv;charset=utf-8," +
+        'Fecha,Hora,Tipo,Fuente,Ubicación,Estados,Carretera,Título,Descripción,¿Tiene ubicación?\n' +
+        history.map(r => {
+          const d = new Date(r.detectedAt);
+          const esc = s => `"${(s||'').replace(/"/g,'""')}"`;
+          return [
+            d.toLocaleDateString(),
+            d.toLocaleTimeString(),
+            r.type,
+            r.feedSource,
+            esc(r.locationName),
+            r.estados?.join('/') || '',
+            r.carretera || '',
+            esc(r.title),
+            esc(r.description),
+            r.ignored ? 'No' : 'Sí'
+          ].join(',');
+        }).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "alertas_carreteras_mx.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    // ✅ BOTÓN NOTIFICACIONES
+    el('enable-notifications').onclick = async () => {
+      const granted = await requestPushPermission();
+      if (granted) {
+        el('enable-notifications').textContent = '🔔 Activas';
+        el('enable-notifications').style.opacity = '0.7';
+      }
+    };
+
+    // Iniciar
     renderAlerts();
     updateStatusUI();
-    el('status').textContent = `OK — nuevas: ${added}`;
-    lastUpdate = Date.now();
-    updateStatusUI();
-
-  }catch(e){
-    console.error(e);
-    el('status').innerHTML = 'ERROR: ' + (e.message || e.toString()).slice(0,200);
-  }
-}
-
-/* start */
-renderAlerts();
-updateStatusUI();
-updateAlerts();
-setInterval(updateAlerts, 60000);
-</script>
+    updateAlerts();
+    setInterval(updateAlerts, 60000);
+  </script>
 </body>
 </html>
